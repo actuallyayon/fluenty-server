@@ -18,15 +18,6 @@ export const auth = betterAuth({
     'http://localhost:3000',
     'http://localhost:5000',
   ],
-  advanced: {
-    crossSubDomainCookies: {
-      enabled: true,
-    },
-    defaultCookieAttributes: {
-      sameSite: 'none',
-      secure: true,
-    },
-  },
   emailAndPassword: {
     enabled: true,
     requireEmailVerification: false,
