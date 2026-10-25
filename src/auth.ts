@@ -11,7 +11,22 @@ export const auth = betterAuth({
   }),
   baseURL: env.BETTER_AUTH_URL,
   secret: env.BETTER_AUTH_SECRET,
-  trustedOrigins: [env.CLIENT_URL, 'http://localhost:3000'],
+  trustedOrigins: [
+    env.CLIENT_URL,
+    'https://fluenty-client.vercel.app',
+    'https://fluenty-server.vercel.app',
+    'http://localhost:3000',
+    'http://localhost:5000',
+  ],
+  advanced: {
+    crossSubDomainCookies: {
+      enabled: true,
+    },
+    defaultCookieAttributes: {
+      sameSite: 'none',
+      secure: true,
+    },
+  },
   emailAndPassword: {
     enabled: true,
     requireEmailVerification: false,
