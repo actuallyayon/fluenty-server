@@ -1,6 +1,7 @@
 {
   "name": "fluenty-server",
   "version": "1.0.0",
+  "type": "module",
   "description": "Fluenty Express API backend with native MongoDB and Better Auth",
   "main": "dist/index.js",
   "scripts": {

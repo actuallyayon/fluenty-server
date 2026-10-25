@@ -1,4 +1,4 @@
-import rateLimit from 'express-rate-limit';
+import { rateLimit } from 'express-rate-limit';
 
 // Auth endpoints rate limiter (e.g. login, signup, password change)
 export const authRateLimiter = rateLimit({
