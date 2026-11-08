@@ -36,11 +36,14 @@ export const generatedListeningSchema = z.object({
   title: z.string(),
   section: z.number(),
   transcript: z.string(),
+  hasMap: z.boolean().optional(),
+  mapSvgData: z.string().optional(),
+  mapTitle: z.string().optional(),
   questions: z.array(
     z.object({
       order: z.number(),
       prompt: z.string(),
-      type: z.enum(['multiple_choice', 'fill_in_the_blank']),
+      type: z.enum(['multiple_choice', 'fill_in_the_blank', 'map_labelling']),
       options: z.array(z.string()).optional(),
       correctAnswer: z.string(),
       evidenceQuote: z.string(),
@@ -278,30 +281,57 @@ OUTPUT STRICT JSON FORMAT:
     topic: string;
     section: 1 | 2 | 3 | 4;
     questionCount?: number;
+    isMapTest?: boolean;
   }): Promise<GeneratedListening> {
     const qCount = params.questionCount || 3;
+    const isMap = params.isMapTest || params.section === 2;
+
+    const mapGuidelines = isMap
+      ? `
+CRITICAL SECTION 2 MAP / PLAN DIRECTION REQUIREMENT:
+- The script is an official public guide, coordinator, or park ranger giving an audio tour and direction orientation.
+- The guide MUST use explicit compass directions (North, South, East, West) and spatial landmarks ("cross the footbridge over the river", "take the path branching right past the lake", "the building immediately opposite the cafe", "on the south-eastern boundary").
+- Map locations are labelled with letters A, B, C, D, E, F, G.
+- Questions MUST be "map_labelling":
+  - prompt: "Label the map below. Choose the correct letter (A-G) for: [Location Name]"
+  - options: ["A", "B", "C", "D", "E", "F", "G"]
+  - correctAnswer: "A" or "B" or "C" etc.
+- Set "hasMap": true, and "mapTitle": "Map of [Location/Park/Campus]"`
+      : '';
+
     const prompt = `You are an expert Cambridge IELTS Listening Test Designer.
 Create an authentic IELTS Listening audio script and ${qCount} questions.
 TOPIC: ${params.topic}
-SECTION: Section ${params.section} (${params.section === 1 ? 'Social dialogue e.g. booking or enquiry' : params.section === 2 ? 'Monologue on general topic' : params.section === 3 ? 'Academic discussion between 2-3 students/tutor' : 'Academic lecture'})
+SECTION: Section ${params.section} (${
+      params.section === 1
+        ? 'Social dialogue between 2 speakers, e.g. booking or enquiry'
+        : params.section === 2
+        ? 'Monologue on general topic e.g. local guide, park map & plan directions'
+        : params.section === 3
+        ? 'Academic discussion between 2-3 students and a tutor'
+        : 'University academic lecture by single speaker'
+    })
+${mapGuidelines}
 
 REQUIREMENTS:
-1. Dialogue script must be natural British/International English, approximately 350-500 words with clear speaker turns.
-2. Generate ${qCount} questions (multiple_choice or fill_in_the_blank).
+1. Audio script must be natural British/International English, approximately 350-500 words with clear spoken cues and pauses.
+2. Generate ${qCount} questions (mix of "map_labelling", "multiple_choice", or "fill_in_the_blank").
 3. Include verbatim evidenceQuote and detailed explanation in both Bengali and English.
 
 OUTPUT STRICT JSON FORMAT:
 {
   "title": "Title of Listening Test",
   "section": ${params.section},
-  "transcript": "Speaker A: ...\\nSpeaker B: ...",
+  "hasMap": ${isMap},
+  "mapTitle": "${isMap ? 'Map and Plan Directions' : ''}",
+  "transcript": "Audio monologue or dialogue script...",
   "questions": [
     {
       "order": 1,
       "prompt": "Question prompt",
-      "type": "multiple_choice",
-      "options": ["A. ...", "B. ...", "C. ..."],
-      "correctAnswer": "A. ...",
+      "type": "${isMap ? 'map_labelling' : 'multiple_choice'}",
+      "options": ["A", "B", "C", "D", "E", "F", "G"],
+      "correctAnswer": "B",
       "evidenceQuote": "exact sentence from transcript",
       "explanationBn": "বাংলায় ব্যাখ্যা...",
       "explanationEn": "English explanation..."
@@ -423,8 +453,11 @@ OUTPUT STRICT JSON FORMAT:
       _id: new ObjectId(),
       title: generated.title,
       section: sectionNum,
-      audioUrl: audioUrl || '/audio/library_orientation.wav',
+      audioUrl: audioUrl || 'ai-speech://auto',
       transcript: generated.transcript,
+      hasMap: generated.hasMap || false,
+      mapTitle: generated.mapTitle || '',
+      mapSvgData: generated.mapSvgData || '',
       status: 'published' as const,
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -443,6 +476,8 @@ OUTPUT STRICT JSON FORMAT:
       explanationEn: q.explanationEn,
       evidenceQuote: q.evidenceQuote,
       order: q.order,
+      mapTitle: generated.mapTitle,
+      mapSvgData: generated.mapSvgData,
       status: 'published' as const,
       createdAt: new Date(),
       updatedAt: new Date(),
