@@ -9,7 +9,7 @@ export const auth = betterAuth({
   database: mongodbAdapter(db, {
     client,
   }),
-  baseURL: env.BETTER_AUTH_URL,
+  baseURL: env.CLIENT_URL || env.BETTER_AUTH_URL,
   secret: env.BETTER_AUTH_SECRET,
   trustedOrigins: [
     env.CLIENT_URL,
@@ -28,6 +28,7 @@ export const auth = betterAuth({
           google: {
             clientId: env.GOOGLE_CLIENT_ID,
             clientSecret: env.GOOGLE_CLIENT_SECRET,
+            redirectURI: `${env.CLIENT_URL || env.BETTER_AUTH_URL}/api/auth/callback/google`,
           },
         }
       : {}),

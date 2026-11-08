@@ -49,6 +49,12 @@ export const practiceRepository = {
       timeLimitMinutes: number;
       questionCount: number;
       createdAt: Date;
+      source?: string;
+      sourceName?: string;
+      sourceUrl?: string;
+      topic?: string;
+      headlineSnippet?: string;
+      reasonPicked?: string;
     }>
   > {
     const passages = await collections
@@ -71,6 +77,12 @@ export const practiceRepository = {
           timeLimitMinutes: passage.timeLimitMinutes,
           questionCount,
           createdAt: passage.createdAt,
+          source: passage.source,
+          sourceName: passage.sourceName,
+          sourceUrl: passage.sourceUrl,
+          topic: passage.topic,
+          headlineSnippet: passage.headlineSnippet,
+          reasonPicked: passage.reasonPicked,
         };
       })
     );
@@ -85,6 +97,12 @@ export const practiceRepository = {
       content: string;
       difficulty: string;
       timeLimitMinutes: number;
+      source?: string;
+      sourceName?: string;
+      sourceUrl?: string;
+      topic?: string;
+      headlineSnippet?: string;
+      reasonPicked?: string;
     };
     questions: Array<{
       id: string;

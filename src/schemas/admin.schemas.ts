@@ -53,6 +53,12 @@ export const createPassageSchema = z.object({
   difficulty: z.enum(['academic', 'general']).default('academic'),
   timeLimitMinutes: z.number().int().min(1).max(120).default(20),
   status: z.enum(['draft', 'published']).default('published'),
+  source: z.string().optional(),
+  sourceName: z.string().optional(),
+  sourceUrl: z.string().optional(),
+  topic: z.string().optional(),
+  headlineSnippet: z.string().optional(),
+  reasonPicked: z.string().optional(),
 });
 
 export const updatePassageSchema = createPassageSchema.partial();

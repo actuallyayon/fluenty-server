@@ -8,11 +8,90 @@ import {
   generatedWritingSchema,
   generatedSpeakingSchema,
 } from '../services/ai/admin-generator.service.js';
+import { newsPortalService } from '../services/news/news-portal.service.js';
 
 export const adminAiRoutes = Router();
 
 // Protect all admin AI routes with requireAdmin
 adminAiRoutes.use(requireAdmin);
+
+// ==========================================
+// News Portals & British Council Integration
+// ==========================================
+
+// GET /api/admin/ai/news-portals - List all connected news portals & educational feeds
+adminAiRoutes.get('/news-portals', async (_req: AuthenticatedRequest, res: Response) => {
+  try {
+    const portals = newsPortalService.getPortals();
+    res.json({ success: true, portals });
+  } catch (error: any) {
+    console.error('Fetch news portals error:', error);
+    res.status(500).json({ success: false, error: error.message || 'Failed to list news portals' });
+  }
+});
+
+// GET /api/admin/ai/news-portals/:portalId/articles - Fetch articles & news lines from selected portal
+adminAiRoutes.get('/news-portals/:portalId/articles', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { portalId } = req.params;
+    if (portalId === 'all') {
+      const allData = await newsPortalService.fetchAllPortalsArticles();
+      res.json({ success: true, ...allData, isLive: true });
+      return;
+    }
+
+    const data = await newsPortalService.fetchArticlesFromPortal(portalId);
+    res.json({ success: true, ...data });
+  } catch (error: any) {
+    console.error(`Fetch articles error for ${req.params.portalId}:`, error);
+    res.status(500).json({ success: false, error: error.message || 'Failed to fetch portal articles' });
+  }
+});
+
+// POST /api/admin/ai/generate-from-news - Transform specific selected news article into IELTS test
+adminAiRoutes.post('/generate-from-news', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { article, difficulty, questionCount } = req.body;
+    if (!article || !article.title) {
+      res.status(400).json({ success: false, error: 'Valid news article item is required' });
+      return;
+    }
+
+    const generated = await adminGeneratorService.generateReadingFromNews({
+      article,
+      difficulty: difficulty || 'medium',
+      questionCount: Number(questionCount) || 4,
+    });
+
+    res.json({ success: true, generated });
+  } catch (error: any) {
+    console.error('Generate reading from news error:', error);
+    res.status(500).json({ success: false, error: error.message || 'Failed to generate reading from news' });
+  }
+});
+
+// POST /api/admin/ai/auto-pick-news-reading - AI reviews portals, picks best article, & generates IELTS test
+adminAiRoutes.post('/auto-pick-news-reading', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { portalId, difficulty, questionCount } = req.body;
+
+    const result = await adminGeneratorService.autoPickAndGenerateNewsReading({
+      portalId: portalId || 'all',
+      difficulty: difficulty || 'medium',
+      questionCount: Number(questionCount) || 4,
+    });
+
+    res.json({
+      success: true,
+      pickedArticle: result.pickedArticle,
+      reasonPicked: result.reasonPicked,
+      generated: result.reading,
+    });
+  } catch (error: any) {
+    console.error('Auto-pick news reading error:', error);
+    res.status(500).json({ success: false, error: error.message || 'Auto-pick news reading failed' });
+  }
+});
 
 // 1. Generate Reading Draft
 adminAiRoutes.post('/generate-reading', async (req: AuthenticatedRequest, res: Response) => {
