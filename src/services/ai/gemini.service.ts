@@ -396,6 +396,7 @@ Evaluate the candidate's essay now according to the four IELTS criteria and outp
     part: 1 | 2 | 3;
     topic: string;
     cueCard?: string;
+    candidateName?: string;
     conversationHistory: Array<{ role: 'examiner' | 'user'; content: string }>;
   }): Promise<{ examinerQuestion: string; isPartComplete: boolean }> {
     // Collect questions previously asked by examiner to prevent repetitive loops
@@ -408,8 +409,15 @@ Evaluate the candidate's essay now according to the four IELTS criteria and outp
       .map((m) => `${m.role === 'examiner' ? 'Dr. Sarah (Examiner)' : 'Candidate'}: ${m.content}`)
       .join('\n');
 
+    const candidateName = (params.candidateName || 'Candidate').trim();
+
     const prompt = `You are Dr. Sarah Jenkins, an experienced, authentic, warm, and professional British IELTS examiner (female).
 You are conducting an official Cambridge IELTS Speaking Test.
+
+CANDIDATE INFORMATION:
+- Registered Name: "${candidateName}" (Native Bangladeshi / Bengali speaker).
+- Accent Sensitivity: The candidate speaks English with a natural Bangladeshi / South Asian accent. Be perceptive, warm, and fully understanding of South Asian English pronunciation.
+- Candidate Name Handling: When the candidate states their name, introduces themselves, or tells you what to call them, acknowledge their name accurately and address them respectfully as "${candidateName}" (or whatever preferred short name they provide). NEVER alter, mispronounce, or mock their name, and never substitute random English words (such as "Iron" for "Ayon"). If speech-to-text slightly mishears their name phonetically, intelligently recognize that they are referring to their real name "${candidateName}".
 
 TEST CONTEXT:
 - Current Section: Part ${params.part}
@@ -424,7 +432,7 @@ ${previousExaminerQuestions.map((q, idx) => `${idx + 1}. ${q}`).join('\n')}
 
 INSTRUCTIONS:
 1. Speak naturally as Dr. Sarah Jenkins.
-2. React briefly and warmly to the candidate's last answer before asking your next question (e.g., "Thank you.", "That is quite interesting.", "I see.", "Right, thank you.").
+2. React briefly and warmly to the candidate's last answer before asking your next question (e.g., "Thank you, ${candidateName}.", "That is quite interesting.", "I see, thank you.").
 3. Ask exactly ONE fresh, realistic Cambridge IELTS question appropriate for Part ${params.part}.
 4. NEVER repeat or rephrase any question from the "QUESTIONS ALREADY ASKED" list.
 5. In Part 1: Ask about everyday preferences, routines, or familiar experiences. Keep it to 1-2 conversational sentences.

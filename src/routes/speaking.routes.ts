@@ -53,9 +53,10 @@ const startSessionSchema = z.object({
 speakingRoutes.post('/sessions/start', async (req: AuthenticatedRequest, res: Response) => {
   try {
     const userId = req.user!.id;
+    const candidateName = (req.body?.candidateName as string) || req.user?.name;
     const { cueCardId } = startSessionSchema.parse(req.body);
 
-    const session = await speakingRepository.startSession(userId, cueCardId);
+    const session = await speakingRepository.startSession(userId, cueCardId, candidateName);
     if (!session) {
       res.status(404).json({ success: false, error: 'Cue card not found' });
       return;
@@ -92,13 +93,15 @@ const sendMessageSchema = z
 speakingRoutes.post('/sessions/:id/message', async (req: AuthenticatedRequest, res: Response) => {
   try {
     const userId = req.user!.id;
+    const candidateName = (req.body?.candidateName as string) || req.user?.name;
     const { candidateAnswer, part } = sendMessageSchema.parse(req.body);
 
     const result = await speakingRepository.sendCandidateMessage(
       userId,
       req.params.id,
       candidateAnswer,
-      part
+      part,
+      candidateName
     );
 
     if (!result) {

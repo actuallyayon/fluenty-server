@@ -1,5 +1,5 @@
 import { ObjectId } from 'mongodb';
-import { collections } from '../db/index.js';
+import { collections, getDb } from '../db/index.js';
 import { profileRepository } from './profile.repository.js';
 import { geminiService, SpeakingFeedbackOutput } from '../services/ai/gemini.service.js';
 import type { SpeakingCueDoc, SpeakingSessionDoc } from '../types/collections.js';
@@ -44,7 +44,8 @@ export const speakingRepository = {
 
   async startSession(
     userId: string,
-    cueCardId: string
+    cueCardId: string,
+    candidateName?: string
   ): Promise<{
     sessionId: string;
     topic: string;
@@ -54,7 +55,7 @@ export const speakingRepository = {
     const cue = await this.getCueCardById(cueCardId);
     if (!cue) return null;
 
-    const initialQuestion = `Good day! Welcome to your IELTS Speaking test. My name is Dr. Sarah Jenkins and I will be your examiner today. To begin with, could you please tell me your full name, and whether you are currently studying or working?`;
+    const initialQuestion = `Good day! Welcome to your IELTS Speaking test. My name is Dr. Sarah Jenkins and I will be your examiner today. Could you please tell me your full name, and whether you are currently studying or working?`;
 
     const sessionDoc: SpeakingSessionDoc = {
       _id: new ObjectId(),
@@ -86,7 +87,8 @@ export const speakingRepository = {
     userId: string,
     sessionId: string,
     candidateAnswer: string,
-    currentPart: 1 | 2 | 3 = 1
+    currentPart: 1 | 2 | 3 = 1,
+    candidateName?: string
   ): Promise<{
     examinerReply: string;
     transcript: Array<{ role: 'examiner' | 'user'; part: 1 | 2 | 3; content: string }>;
@@ -96,6 +98,17 @@ export const speakingRepository = {
 
     const session = await collections.speakingSessions().findOne({ _id: sId, userId });
     if (!session) return null;
+
+    // Resolve candidate name from user profile if not passed directly
+    let resolvedName = candidateName;
+    if (!resolvedName) {
+      try {
+        const userDoc = await getDb().collection('user').findOne({ _id: ObjectId.isValid(userId) ? new ObjectId(userId) : (userId as any) });
+        if (userDoc?.name) resolvedName = userDoc.name as string;
+      } catch {
+        // ignore
+      }
+    }
 
     // Append candidate message
     const updatedTranscript = [
@@ -108,11 +121,12 @@ export const speakingRepository = {
       },
     ];
 
-    // Get Gemini examiner question
+    // Get Gemini examiner question with candidate profile & accent awareness
     const history = updatedTranscript.map((t) => ({ role: t.role, content: t.content }));
     const examinerResponse = await geminiService.generateSpeakingExaminerResponse({
       part: currentPart,
       topic: session.cueCardPrompt,
+      candidateName: resolvedName,
       conversationHistory: history,
     });
 
