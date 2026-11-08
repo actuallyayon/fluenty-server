@@ -133,7 +133,25 @@ export const createSpeakingCueSchema = z.object({
 export const updateSpeakingCueSchema = createSpeakingCueSchema.partial();
 
 // ==========================================
-// 7. User Management Schemas
+// 7. Mock Exam Schemas
+// ==========================================
+export const createMockExamSchema = z.object({
+  title: z.string().trim().min(1, 'Exam title is required').max(200),
+  descriptionBn: z.string().trim().default('আইইএলটিএস পূর্ণাঙ্গ কম্পিউটার ডেলিভার্ড মক টেস্ট।'),
+  descriptionEn: z.string().trim().default('Full-length IELTS Computer-Delivered Mock Exam covering all 4 skills.'),
+  difficulty: z.enum(['standard', 'challenging']).default('standard'),
+  readingPassageId: z.string().min(1, 'Reading passage is required'),
+  listeningItemId: z.string().min(1, 'Listening test is required'),
+  writingTask1PromptId: z.string().min(1, 'Writing Task 1 prompt is required'),
+  writingTask2PromptId: z.string().min(1, 'Writing Task 2 prompt is required'),
+  speakingCueId: z.string().min(1, 'Speaking cue card is required'),
+  status: z.enum(['draft', 'published']).default('published'),
+});
+
+export const updateMockExamSchema = createMockExamSchema.partial();
+
+// ==========================================
+// 8. User Management Schemas
 // ==========================================
 export const banUserSchema = z.object({
   banned: z.boolean(),

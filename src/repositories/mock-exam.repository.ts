@@ -392,4 +392,83 @@ export const mockExamRepository = {
       completedAt: attempt.completedAt,
     };
   },
+
+  // 6. Admin: List all Mock Exams with enriched module summaries
+  async listAdminMockExams() {
+    const exams = await collections.mockExams().find().sort({ createdAt: -1 }).toArray();
+
+    const enriched = await Promise.all(
+      exams.map(async (exam) => {
+        const [reading, listening, task1, task2, speaking] = await Promise.all([
+          collections.passages().findOne({ _id: exam.readingPassageId }, { projection: { title: 1, difficulty: 1 } }),
+          collections.listeningItems().findOne({ _id: exam.listeningItemId }, { projection: { title: 1, section: 1, hasMap: 1 } }),
+          collections.writingPrompts().findOne({ _id: exam.writingTask1PromptId }, { projection: { title: 1 } }),
+          collections.writingPrompts().findOne({ _id: exam.writingTask2PromptId }, { projection: { title: 1 } }),
+          collections.speakingCues().findOne({ _id: exam.speakingCueId }, { projection: { topic: 1 } }),
+        ]);
+
+        return {
+          id: exam._id.toString(),
+          title: exam.title,
+          descriptionBn: exam.descriptionBn,
+          descriptionEn: exam.descriptionEn,
+          difficulty: exam.difficulty,
+          status: exam.status,
+          createdAt: exam.createdAt,
+          readingPassage: reading ? { id: reading._id.toString(), title: reading.title } : null,
+          listeningItem: listening ? { id: listening._id.toString(), title: listening.title, section: listening.section, hasMap: listening.hasMap } : null,
+          writingTask1: task1 ? { id: task1._id.toString(), title: task1.title } : null,
+          writingTask2: task2 ? { id: task2._id.toString(), title: task2.title } : null,
+          speakingCue: speaking ? { id: speaking._id.toString(), topic: speaking.topic } : null,
+        };
+      })
+    );
+
+    return enriched;
+  },
+
+  // 7. Admin: Assemble & Create New Mock Exam
+  async createMockExam(data: {
+    title: string;
+    descriptionBn: string;
+    descriptionEn: string;
+    difficulty: 'standard' | 'challenging';
+    readingPassageId: string;
+    listeningItemId: string;
+    writingTask1PromptId: string;
+    writingTask2PromptId: string;
+    speakingCueId: string;
+    status: 'draft' | 'published';
+  }) {
+    const doc: MockExamDoc = {
+      _id: new ObjectId(),
+      title: data.title,
+      descriptionBn: data.descriptionBn,
+      descriptionEn: data.descriptionEn,
+      readingPassageId: new ObjectId(data.readingPassageId),
+      listeningItemId: new ObjectId(data.listeningItemId),
+      writingTask1PromptId: new ObjectId(data.writingTask1PromptId),
+      writingTask2PromptId: new ObjectId(data.writingTask2PromptId),
+      speakingCueId: new ObjectId(data.speakingCueId),
+      difficulty: data.difficulty,
+      status: data.status,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    await collections.mockExams().insertOne(doc);
+    return { id: doc._id.toString() };
+  },
+
+  // 8. Admin: Delete Mock Exam
+  async deleteMockExam(examId: string) {
+    if (!ObjectId.isValid(examId)) return false;
+    const eId = new ObjectId(examId);
+    const res = await collections.mockExams().deleteOne({ _id: eId });
+    if (res.deletedCount > 0) {
+      await collections.mockExamAttempts().deleteMany({ mockExamId: eId });
+      return true;
+    }
+    return false;
+  },
 };

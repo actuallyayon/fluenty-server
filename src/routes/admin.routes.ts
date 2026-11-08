@@ -4,6 +4,7 @@ import { ObjectId } from 'mongodb';
 import { requireAdmin, AuthenticatedRequest } from '../middlewares/auth.js';
 import { contentRepository } from '../repositories/content.repository.js';
 import { adminUserRepository } from '../repositories/admin-user.repository.js';
+import { mockExamRepository } from '../repositories/mock-exam.repository.js';
 import { collections } from '../db/index.js';
 import {
   createVocabSchema,
@@ -20,6 +21,8 @@ import {
   updateWritingPromptSchema,
   createSpeakingCueSchema,
   updateSpeakingCueSchema,
+  createMockExamSchema,
+  updateMockExamSchema,
   banUserSchema,
   updateRoleSchema,
   updatePlanSchema,
@@ -582,6 +585,48 @@ adminRoutes.delete('/speaking-cues/:id', async (req: AuthenticatedRequest, res: 
   } catch (error) {
     console.error('Delete speaking cue error:', error);
     res.status(500).json({ success: false, error: 'Failed to delete speaking cue' });
+  }
+});
+
+// ==========================================
+// 6B. Mock Exam Assembler Endpoints
+// ==========================================
+adminRoutes.get('/mock-exams', async (_req: AuthenticatedRequest, res: Response) => {
+  try {
+    const exams = await mockExamRepository.listAdminMockExams();
+    res.json({ success: true, exams });
+  } catch (error) {
+    console.error('List mock exams error:', error);
+    res.status(500).json({ success: false, error: 'Failed to list mock exams' });
+  }
+});
+
+adminRoutes.post('/mock-exams', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const parsed = createMockExamSchema.parse(req.body);
+    const result = await mockExamRepository.createMockExam(parsed);
+    res.status(201).json({ success: true, ...result });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      res.status(400).json({ success: false, error: 'Validation failed', details: error.flatten() });
+      return;
+    }
+    console.error('Create mock exam error:', error);
+    res.status(500).json({ success: false, error: 'Failed to create mock exam' });
+  }
+});
+
+adminRoutes.delete('/mock-exams/:id', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const deleted = await mockExamRepository.deleteMockExam(req.params.id);
+    if (!deleted) {
+      res.status(404).json({ success: false, error: 'Mock exam not found' });
+      return;
+    }
+    res.json({ success: true, message: 'Mock exam deleted successfully' });
+  } catch (error) {
+    console.error('Delete mock exam error:', error);
+    res.status(500).json({ success: false, error: 'Failed to delete mock exam' });
   }
 });
 
