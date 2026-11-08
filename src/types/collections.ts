@@ -82,6 +82,12 @@ export interface PassageDoc {
   difficulty: 'academic' | 'general';
   timeLimitMinutes: number;
   status: 'draft' | 'published';
+  source?: string; // 'british_council' | 'bbc' | 'the_guardian' | 'reuters' | 'daily_star' | string
+  sourceName?: string; // Display name e.g. 'British Council IELTS', 'BBC News'
+  sourceUrl?: string; // Original news or article URL
+  topic?: string;
+  headlineSnippet?: string; // Key newspaper lines or excerpt
+  reasonPicked?: string; // Why AI chose this news story
   createdAt: Date;
   updatedAt: Date;
 }

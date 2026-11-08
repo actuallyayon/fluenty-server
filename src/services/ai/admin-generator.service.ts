@@ -2,6 +2,7 @@ import { ObjectId } from 'mongodb';
 import { z } from 'zod';
 import { geminiService } from './gemini.service.js';
 import { collections } from '../../db/index.js';
+import { newsPortalService, type NewsArticleItem } from '../news/news-portal.service.js';
 
 // ==========================================
 // Schemas for Gemini Structured Generation
@@ -12,11 +13,16 @@ export const generatedReadingSchema = z.object({
   topic: z.string(),
   difficulty: z.enum(['easy', 'medium', 'hard']),
   passage: z.string(),
+  source: z.string().optional(),
+  sourceName: z.string().optional(),
+  sourceUrl: z.string().optional(),
+  reasonPicked: z.string().optional(),
+  headlineSnippet: z.string().optional(),
   questions: z.array(
     z.object({
       order: z.number(),
       prompt: z.string(),
-      type: z.enum(['multiple_choice', 'true_false_not_given', 'fill_in_the_blank']),
+      type: z.enum(['multiple_choice', 'true_false_not_given', 'fill_in_the_blank', 'matching_headings']),
       options: z.array(z.string()).optional(),
       correctAnswer: z.string(),
       evidenceQuote: z.string(),
@@ -110,6 +116,161 @@ OUTPUT STRICT JSON FORMAT:
     const raw = await geminiService.generateContentWithRetry(prompt);
     const clean = geminiService.cleanJsonText(raw);
     return generatedReadingSchema.parse(JSON.parse(clean));
+  },
+
+  // 1B. Generate Reading Passage from Selected News Article / British Council Lines
+  async generateReadingFromNews(params: {
+    article: NewsArticleItem;
+    difficulty: 'easy' | 'medium' | 'hard';
+    questionCount?: number;
+  }): Promise<GeneratedReading> {
+    const qCount = params.questionCount || 4;
+    const linesFormatted = params.article.lines
+      .map((line, idx) => `  ${idx + 1}. "${line}"`)
+      .join('\n');
+
+    const prompt = `You are a Senior Cambridge IELTS Test Writer.
+Your task is to transform authentic journalism lines and British Council academic content into an authentic, rigorous IELTS Academic Reading Passage with ${qCount} realistic questions.
+
+AUTHENTIC SOURCE:
+- Portal / Outlet: ${params.article.portalName}
+- Original Headline: "${params.article.title}"
+- Key Newspaper Lines & Verbatim Quotes:
+${linesFormatted}
+- Summary & Context: ${params.article.snippet}
+- Target Difficulty: ${params.difficulty}
+
+REQUIREMENTS:
+1. PASSAGE (500-750 words):
+   - Academic register with formal discourse markers.
+   - Divided into labelled paragraphs: [Paragraph A], [Paragraph B], [Paragraph C], [Paragraph D] (and [Paragraph E] if appropriate).
+   - Must incorporate the authentic newspaper lines and key facts directly into the narrative.
+   - Include analytical discussion, scientific or socio-economic implications, and contrasting perspectives typical of British Council / Cambridge IELTS tests.
+2. QUESTIONS (Exactly ${qCount} questions):
+   - Mix between:
+     * "multiple_choice" (4 distinct options with letters A, B, C, D)
+     * "true_false_not_given" (options: ["True", "False", "Not Given"])
+     * "fill_in_the_blank" (requires exact word or short phrase from text)
+     * "matching_headings" (choose the correct paragraph heading from options)
+3. For EACH question provide:
+   - 'evidenceQuote': Verbatim sentence from the passage proving the answer.
+   - 'explanationBn': Detailed, pedagogical explanation in Bengali explaining the logic, trap evasion, and grammar/vocabulary connections for Bangladeshi IELTS candidates.
+   - 'explanationEn': Clear academic explanation in English.
+
+OUTPUT STRICT JSON FORMAT:
+{
+  "title": "${params.article.title.replace(/"/g, '\\"')}",
+  "topic": "${params.article.suggestedTopic.replace(/"/g, '\\"')}",
+  "difficulty": "${params.difficulty}",
+  "source": "${params.article.portalId}",
+  "sourceName": "${params.article.portalName.replace(/"/g, '\\"')}",
+  "sourceUrl": "${params.article.url}",
+  "headlineSnippet": "${params.article.title.replace(/"/g, '\\"')}",
+  "reasonPicked": "Selected from ${params.article.portalName} due to its rich analytical vocabulary and strong thematic relevance to IELTS Academic topics.",
+  "passage": "Full passage text with [Paragraph A], [Paragraph B], etc.",
+  "questions": [
+    {
+      "order": 1,
+      "prompt": "Question text here",
+      "type": "multiple_choice",
+      "options": ["A. Option 1", "B. Option 2", "C. Option 3", "D. Option 4"],
+      "correctAnswer": "A. Option 1",
+      "evidenceQuote": "exact quote from text",
+      "explanationBn": "বাংলায় বিস্তারিত ব্যাখ্যা...",
+      "explanationEn": "English explanation..."
+    }
+  ]
+}`;
+
+    const raw = await geminiService.generateContentWithRetry(prompt);
+    const clean = geminiService.cleanJsonText(raw);
+    return generatedReadingSchema.parse(JSON.parse(clean));
+  },
+
+  // 1C. Auto-Pick from Connected News Portals / British Council and Generate Reading
+  async autoPickAndGenerateNewsReading(params: {
+    portalId?: string;
+    difficulty?: 'easy' | 'medium' | 'hard';
+    questionCount?: number;
+  }): Promise<{ pickedArticle: NewsArticleItem; reasonPicked: string; reading: GeneratedReading }> {
+    const targetDifficulty = params.difficulty || 'medium';
+    const qCount = params.questionCount || 4;
+
+    // Fetch candidate articles from news portals
+    let candidateArticles: NewsArticleItem[] = [];
+    if (params.portalId && params.portalId !== 'all') {
+      const portalData = await newsPortalService.fetchArticlesFromPortal(params.portalId);
+      candidateArticles = portalData.articles;
+    } else {
+      const allData = await newsPortalService.fetchAllPortalsArticles();
+      candidateArticles = allData.articles;
+    }
+
+    if (candidateArticles.length === 0) {
+      throw new Error('No news articles available from the connected portals.');
+    }
+
+    // Step 1: Let Gemini inspect the candidates and autonomously pick the most pedagogically valuable news story
+    const candidateSummaries = candidateArticles.map((art, idx) => ({
+      index: idx,
+      id: art.id,
+      portal: art.portalName,
+      title: art.title,
+      topic: art.suggestedTopic,
+      sampleLine: art.lines[0] || art.snippet,
+    }));
+
+    const pickerPrompt = `You are a Chief Cambridge IELTS Academic Content Curator.
+Review the following authentic news items and British Council feeds:
+
+${JSON.stringify(candidateSummaries, null, 2)}
+
+SELECT the SINGLE BEST article candidate for creating an authentic, high-band IELTS Academic Reading test.
+Criteria:
+- Depth of topic (science, ecology, psychology, linguistics, or technology)
+- Richness of lexical resource and argumentative structure
+- Suitability for IELTS question types (Heading Matching, True/False/Not Given)
+
+OUTPUT STRICT JSON FORMAT:
+{
+  "selectedIndex": 0,
+  "reasonPicked": "2-3 sentences explaining why this article offers superior IELTS Academic reading rigor and vocabulary."
+}`;
+
+    let pickedArticle = candidateArticles[0];
+    let reasonPicked = 'Selected for high academic relevance and vocabulary density.';
+
+    try {
+      const pickerRaw = await geminiService.generateContentWithRetry(pickerPrompt, { fastMode: true });
+      const pickerClean = geminiService.cleanJsonText(pickerRaw);
+      const parsedPicker = JSON.parse(pickerClean);
+      if (
+        typeof parsedPicker.selectedIndex === 'number' &&
+        candidateArticles[parsedPicker.selectedIndex]
+      ) {
+        pickedArticle = candidateArticles[parsedPicker.selectedIndex];
+        reasonPicked = parsedPicker.reasonPicked || reasonPicked;
+      }
+    } catch (err) {
+      console.warn('AI news picker fallback to first item:', err);
+      // Defaults to the first curated candidate
+      pickedArticle = candidateArticles[0];
+    }
+
+    // Step 2: Transform the picked article into the IELTS Reading Test
+    const reading = await this.generateReadingFromNews({
+      article: pickedArticle,
+      difficulty: targetDifficulty,
+      questionCount: qCount,
+    });
+
+    reading.reasonPicked = reasonPicked;
+
+    return {
+      pickedArticle,
+      reasonPicked,
+      reading,
+    };
   },
 
   // 2. Generate Listening Script & Questions
@@ -214,6 +375,12 @@ OUTPUT STRICT JSON FORMAT:
       timeLimitMinutes: 20,
       difficulty: 'academic' as const,
       status: 'published' as const,
+      source: generated.source || 'news_portal',
+      sourceName: generated.sourceName || 'Authentic News Source',
+      sourceUrl: generated.sourceUrl || '',
+      topic: generated.topic || '',
+      headlineSnippet: generated.headlineSnippet || '',
+      reasonPicked: generated.reasonPicked || '',
       createdAt: new Date(),
       updatedAt: new Date(),
     };
