@@ -72,140 +72,129 @@ const LONDON_MAP_SVG = `<svg viewBox="0 0 650 380" className="w-full max-w-xl h-
   </g>
 </svg>`;
 
-const LONDON_TRANSCRIPT = `Tour Guide: Good morning everyone, and a warm welcome to our London Bridge historical walking tour. Before we set off across the river, please take a look at the map of the Southwark and City riverside area in front of you.
-We are currently gathering at the southern approach of London Bridge, marked "START HERE" on your plan. Now, a very common misconception visitors have is confusing London Bridge with the famous twin-towered Tower Bridge further downriver. London Bridge is a modern, clean-lined concrete structure completed in nineteen seventy-three, though bridges have stood on this exact site since Roman times.
-Let me direct you to several key landmarks you will see today.
-First, if you look directly to your left—that is, heading slightly west along the south embankment path—you will find Southwark Cathedral, marked as location A on your plan. It is one of London's oldest Gothic churches.
-Continuing past the cathedral further to the south-west, just behind the railway arches, is the historic Borough Market at location B, famous for its artisanal foods and Victorian glass roof.
-Now, if you turn around and gaze south-east, towering over the railway terminus, you cannot miss The Shard at location C—Western Europe's tallest skyscraper at over three hundred meters.
-When we cross over London Bridge to the north bank of the Thames, we will reach the City of London. Once you step off the northern end of the bridge and head north-east along the pedestrian walkway, you will encounter the Great Fire of London Monument, designed by Sir Christopher Wren, indicated at location D.
-Finally, nestled right on the riverbank to the east of the bridge stands St. Magnus the Martyr Church at location E, which once marked the medieval entrance to old London Bridge.`;
+const LONDON_TRANSCRIPT = `Guide: Good morning and welcome everyone to our London Bridge historical walking tour. Before we begin our walk across the River Thames, please look carefully at the map of the Southwark and City riverside area on your display.
+We are currently gathered at the southern approach of London Bridge, marked START HERE at the bottom of the plan. A very common mistake visitors make is confusing London Bridge with the famous twin-towered Tower Bridge situated further downriver. London Bridge is a sleek concrete structure opened in 1973, though crossings have stood here since Roman times.
+Now, let me orient you to the key landmarks around us.
+First, looking directly to your left—heading west along the south embankment path—you will see Southwark Cathedral at location A. It is one of London's oldest Gothic churches.
+If you continue past the cathedral slightly further south-west under the railway arches, you will arrive at Borough Market, marked at location B, renowned for gourmet food and fresh produce.
+Now turning towards the south-east, dominating the skyline above the station, stands The Shard at location C—Western Europe's tallest skyscraper.
+Next, as we cross London Bridge to the north bank of the Thames, we enter the City of London. Once off the bridge, heading north-east up the pedestrian walkway, you will find the Monument to the Great Fire of London at location D.
+Finally, right along the north riverbank immediately east of the bridge stands St. Magnus the Martyr Church at location E, which once served as the medieval gateway to Old London Bridge.`;
 
-async function upgradeLondonBridge() {
+async function upgradeAllLondonBridge() {
   await connectDB();
-  const targetId = new ObjectId('6af02edf9f0374780c07f530');
+  const items = await collections.listeningItems().find({ title: /London Bridge/i }).toArray();
+  console.log(`Found ${items.length} London Bridge items to upgrade`);
 
-  await collections.listeningItems().updateOne(
-    { _id: targetId },
-    {
-      $set: {
-        title: 'London Bridge Walking Tour',
-        section: 2,
-        audioUrl: 'ai-speech://auto',
-        hasMap: true,
-        mapTitle: 'London Bridge & Riverside Historical Walking Map',
-        mapSvgData: LONDON_MAP_SVG,
-        transcript: LONDON_TRANSCRIPT,
-        status: 'published',
+  for (const item of items) {
+    console.log(`Upgrading item ${item._id.toString()} (${item.title})...`);
+    await collections.listeningItems().updateOne(
+      { _id: item._id },
+      {
+        $set: {
+          title: 'London Bridge Walking Tour',
+          section: 2,
+          audioUrl: 'ai-speech://auto',
+          hasMap: true,
+          mapTitle: 'London Bridge & Riverside Historical Walking Map',
+          mapSvgData: LONDON_MAP_SVG,
+          transcript: LONDON_TRANSCRIPT,
+          status: 'published',
+          updatedAt: new Date(),
+        },
+      }
+    );
+
+    // Remove old questions and insert clean map labelling questions
+    await collections.questions().deleteMany({ listeningItemId: item._id });
+
+    const questions = [
+      {
+        _id: new ObjectId(),
+        listeningItemId: item._id,
+        type: 'map_labelling' as const,
+        prompt: 'Label the map below. Choose the correct letter (A-E) for:\nSouthwark Cathedral',
+        options: ['A', 'B', 'C', 'D', 'E'],
+        correctAnswer: 'A',
+        explanationEn: 'The guide points out that looking west along the south embankment path from the starting point leads directly to Southwark Cathedral at location A.',
+        explanationBn: 'গাইড উল্লেখ করেছেন যে শুরুর স্থান থেকে দক্ষিণ নদীর পাড় ধরে পশ্চিমে তাকালে লোকেশন A-তে সাউথওয়ার্ক ক্যাথেড্রাল অবস্থিত।',
+        evidenceQuote: 'looking directly to your left—heading west along the south embankment path—you will see Southwark Cathedral at location A',
+        order: 1,
+        status: 'published' as const,
+        createdAt: new Date(),
         updatedAt: new Date(),
       },
-      $setOnInsert: {
+      {
+        _id: new ObjectId(),
+        listeningItemId: item._id,
+        type: 'map_labelling' as const,
+        prompt: 'Label the map below. Choose the correct letter (A-E) for:\nBorough Market',
+        options: ['A', 'B', 'C', 'D', 'E'],
+        correctAnswer: 'B',
+        explanationEn: 'Continuing past the cathedral further south-west brings you to Borough Market at location B.',
+        explanationBn: 'ক্যাথেড্রাল পার হয়ে আরও দক্ষিণ-পশ্চিমে গেলে লোকেশন B-তে ঐতিহাসিক বরো মার্কেট রয়েছে।',
+        evidenceQuote: 'continue past the cathedral slightly further south-west under the railway arches, you will arrive at Borough Market, marked at location B',
+        order: 2,
+        status: 'published' as const,
         createdAt: new Date(),
+        updatedAt: new Date(),
       },
-    },
-    { upsert: true }
-  );
+      {
+        _id: new ObjectId(),
+        listeningItemId: item._id,
+        type: 'map_labelling' as const,
+        prompt: 'Label the map below. Choose the correct letter (A-E) for:\nThe Shard',
+        options: ['A', 'B', 'C', 'D', 'E'],
+        correctAnswer: 'C',
+        explanationEn: 'Gazing south-east above London Bridge station reveals The Shard at location C.',
+        explanationBn: 'দক্ষিণ-পূর্বে তাকালে স্টেশনের উপরে ইউরোপের বিখ্যাত আকাশচুম্বী ভবন দ্য শার্ড (লোকেশন C) দেখা যায়।',
+        evidenceQuote: 'turning towards the south-east, dominating the skyline above the station, stands The Shard at location C',
+        order: 3,
+        status: 'published' as const,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        _id: new ObjectId(),
+        listeningItemId: item._id,
+        type: 'map_labelling' as const,
+        prompt: 'Label the map below. Choose the correct letter (A-E) for:\nThe Monument to the Great Fire',
+        options: ['A', 'B', 'C', 'D', 'E'],
+        correctAnswer: 'D',
+        explanationEn: 'Across on the north bank, heading north-east leads to the Monument at location D.',
+        explanationBn: 'ব্রিজ পার হয়ে উত্তর তীরে নেমে উত্তর-পূর্ব দিকে গেলে লোকেশন D-তে মনুমেন্ট পাওয়া যাবে।',
+        evidenceQuote: 'heading north-east up the pedestrian walkway, you will find the Monument to the Great Fire of London at location D',
+        order: 4,
+        status: 'published' as const,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        _id: new ObjectId(),
+        listeningItemId: item._id,
+        type: 'map_labelling' as const,
+        prompt: 'Label the map below. Choose the correct letter (A-E) for:\nSt. Magnus the Martyr Church',
+        options: ['A', 'B', 'C', 'D', 'E'],
+        correctAnswer: 'E',
+        explanationEn: 'On the north riverbank immediately east of London Bridge stands St. Magnus Church at location E.',
+        explanationBn: 'লন্ডন ব্রিজের ঠিক পূর্ব দিকে উত্তর নদীর পাড়ে লোকেশন E-তে সেন্ট ম্যাগনাস চার্চ অবস্থিত।',
+        evidenceQuote: 'right along the north riverbank immediately east of the bridge stands St. Magnus the Martyr Church at location E',
+        order: 5,
+        status: 'published' as const,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    ];
 
-  const updatedItem = await collections.listeningItems().findOne({ _id: targetId });
-  if (!updatedItem) {
-    console.error('Could not find or create item');
-    process.exit(1);
+    await collections.questions().insertMany(questions);
+    console.log(`✅ Item ${item._id.toString()} successfully upgraded with Map SVG, Transcript, and 5 Map Labelling Questions!`);
   }
 
-  // Add Map labelling questions
-  const questions = [
-    {
-      _id: new ObjectId(),
-      listeningItemId: updatedItem._id,
-      type: 'multiple_choice' as const,
-      prompt: 'What common mistake do visitors often make regarding London Bridge?',
-      options: [
-        'A. They think it was built by the Romans.',
-        'B. They confuse it with Tower Bridge.',
-        'C. They believe it is the oldest bridge in the world.',
-      ],
-      correctAnswer: 'B. They confuse it with Tower Bridge.',
-      explanationEn: 'The guide explains that visitors often confuse London Bridge with the twin-towered Tower Bridge downriver.',
-      explanationBn: 'গাইড উল্লেখ করেন যে দর্শনার্থীরা প্রায়শই লন্ডন ব্রিজকে টাওয়ার ব্রিজের সাথে গুলিয়ে ফেলেন।',
-      evidenceQuote: 'a very common misconception visitors have is confusing London Bridge with the famous twin-towered Tower Bridge',
-      order: 1,
-      status: 'published' as const,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    },
-    {
-      _id: new ObjectId(),
-      listeningItemId: updatedItem._id,
-      type: 'map_labelling' as const,
-      prompt: 'Label the map. Choose the correct letter (A-E) for:\nSouthwark Cathedral',
-      options: ['A', 'B', 'C', 'D', 'E'],
-      correctAnswer: 'A',
-      explanationEn: 'The guide states heading slightly west along the south embankment path brings you to Southwark Cathedral at location A.',
-      explanationBn: 'গাইড বলেন দক্ষিণ তীর ধরে কিছুটা পশ্চিমে গেলেই লোকেশন A-তে সাউথওয়ার্ক ক্যাথেড্রাল দেখা যায়।',
-      evidenceQuote: 'heading slightly west along the south embankment path—you will find Southwark Cathedral, marked as location A',
-      order: 2,
-      status: 'published' as const,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    },
-    {
-      _id: new ObjectId(),
-      listeningItemId: updatedItem._id,
-      type: 'map_labelling' as const,
-      prompt: 'Label the map. Choose the correct letter (A-E) for:\nBorough Market',
-      options: ['A', 'B', 'C', 'D', 'E'],
-      correctAnswer: 'B',
-      explanationEn: 'Continuing past the cathedral to the south-west is Borough Market at location B.',
-      explanationBn: 'ক্যাথেড্রাল পেরিয়ে দক্ষিণ-পশ্চিমে গেলেই লোকেশন B-তে বরো মার্কেট অবস্থিত।',
-      evidenceQuote: 'Continuing past the cathedral further to the south-west, just behind the railway arches, is the historic Borough Market at location B',
-      order: 3,
-      status: 'published' as const,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    },
-    {
-      _id: new ObjectId(),
-      listeningItemId: updatedItem._id,
-      type: 'map_labelling' as const,
-      prompt: 'Label the map. Choose the correct letter (A-E) for:\nThe Shard',
-      options: ['A', 'B', 'C', 'D', 'E'],
-      correctAnswer: 'C',
-      explanationEn: 'Looking south-east towers The Shard at location C.',
-      explanationBn: 'দক্ষিণ-পূর্বে তাকালে লোকেশন C-তে দ্য শার্ড স্কাইস্ক্র্যাপার দেখা যায়।',
-      evidenceQuote: 'turn around and gaze south-east, towering over the railway terminus, you cannot miss The Shard at location C',
-      order: 4,
-      status: 'published' as const,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    },
-    {
-      _id: new ObjectId(),
-      listeningItemId: updatedItem._id,
-      type: 'map_labelling' as const,
-      prompt: 'Label the map. Choose the correct letter (A-E) for:\nThe Monument to the Great Fire',
-      options: ['A', 'B', 'C', 'D', 'E'],
-      correctAnswer: 'D',
-      explanationEn: 'On the north bank heading north-east is the Monument at location D.',
-      explanationBn: 'উত্তর তীরে নেমে উত্তর-পূর্বে গেলে লোকেশন D-তে মনুমেন্ট পাওয়া যাবে।',
-      evidenceQuote: 'head north-east along the pedestrian walkway, you will encounter the Great Fire of London Monument... indicated at location D',
-      order: 5,
-      status: 'published' as const,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    },
-  ];
-
-  // Remove old questions and insert clean map questions
-  await collections.questions().deleteMany({ listeningItemId: updatedItem._id });
-  await collections.questions().insertMany(questions);
-
-  console.log(`✅ Successfully upgraded London Bridge Walking Tour with authentic Map SVG and 5 questions!`);
   await client.close();
   process.exit(0);
 }
 
-upgradeLondonBridge().catch((e) => {
-  console.error(e);
+upgradeAllLondonBridge().catch((err) => {
+  console.error('Upgrade error:', err);
   process.exit(1);
 });
-
