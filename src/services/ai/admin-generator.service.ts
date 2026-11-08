@@ -20,35 +20,35 @@ export const generatedReadingSchema = z.object({
   headlineSnippet: z.string().optional(),
   questions: z.array(
     z.object({
-      order: z.number(),
+      order: z.number().optional().default(1),
       prompt: z.string(),
       type: z.enum(['multiple_choice', 'true_false_not_given', 'fill_in_the_blank', 'matching_headings']),
-      options: z.array(z.string()).optional(),
+      options: z.array(z.string()).optional().default([]),
       correctAnswer: z.string(),
-      evidenceQuote: z.string(),
-      explanationBn: z.string(),
-      explanationEn: z.string(),
+      evidenceQuote: z.string().optional().default(''),
+      explanationBn: z.string().optional().default(''),
+      explanationEn: z.string().optional().default(''),
     })
   ),
 });
 
 export const generatedListeningSchema = z.object({
   title: z.string(),
-  section: z.number(),
+  section: z.number().optional().default(2),
   transcript: z.string(),
-  hasMap: z.boolean().optional(),
-  mapSvgData: z.string().optional(),
-  mapTitle: z.string().optional(),
+  hasMap: z.boolean().optional().default(false),
+  mapSvgData: z.string().optional().default(''),
+  mapTitle: z.string().optional().default(''),
   questions: z.array(
     z.object({
-      order: z.number(),
+      order: z.number().optional().default(1),
       prompt: z.string(),
       type: z.enum(['multiple_choice', 'fill_in_the_blank', 'map_labelling']),
-      options: z.array(z.string()).optional(),
+      options: z.array(z.string()).optional().default([]),
       correctAnswer: z.string(),
-      evidenceQuote: z.string(),
-      explanationBn: z.string(),
-      explanationEn: z.string(),
+      evidenceQuote: z.string().optional().default(''),
+      explanationBn: z.string().optional().default(''),
+      explanationEn: z.string().optional().default(''),
     })
   ),
 });
@@ -292,10 +292,11 @@ CRITICAL SECTION 2 MAP / PLAN DIRECTION REQUIREMENT:
 - The script is an official public guide, coordinator, or park ranger giving an audio tour and direction orientation.
 - The guide MUST use explicit compass directions (North, South, East, West) and spatial landmarks ("cross the footbridge over the river", "take the path branching right past the lake", "the building immediately opposite the cafe", "on the south-eastern boundary").
 - Map locations are labelled with letters A, B, C, D, E, F, G.
-- Questions MUST be "map_labelling":
-  - prompt: "Label the map below. Choose the correct letter (A-G) for: [Location Name]"
-  - options: ["A", "B", "C", "D", "E", "F", "G"]
+- ALL questions MUST be "map_labelling":
+  - prompt: "Label the map below. Choose the correct letter (A-E) for: [Location Name]"
+  - options: ["A", "B", "C", "D", "E"]
   - correctAnswer: "A" or "B" or "C" etc.
+  - evidenceQuote: "quote from audio script pointing out this direction"
 - Set "hasMap": true, and "mapTitle": "Map of [Location/Park/Campus]"`
       : '';
 
@@ -315,23 +316,23 @@ ${mapGuidelines}
 
 REQUIREMENTS:
 1. Audio script must be natural British/International English, approximately 350-500 words with clear spoken cues and pauses.
-2. Generate ${qCount} questions (mix of "map_labelling", "multiple_choice", or "fill_in_the_blank").
-3. Include verbatim evidenceQuote and detailed explanation in both Bengali and English.
+2. Generate ${qCount} questions ${isMap ? '(ALL must be type "map_labelling")' : '(mix of "multiple_choice" or "fill_in_the_blank")'}.
+3. Include verbatim evidenceQuote (sentence from transcript) and detailed explanation in both Bengali and English.
 
 OUTPUT STRICT JSON FORMAT:
 {
-  "title": "Title of Listening Test",
+  "title": "${isMap ? 'Map & Orientation: ' : ''}${params.topic.replace(/"/g, '\\"')}",
   "section": ${params.section},
   "hasMap": ${isMap},
-  "mapTitle": "${isMap ? 'Map and Plan Directions' : ''}",
+  "mapTitle": "${isMap ? 'Map and Plan Directions: ' + params.topic.replace(/"/g, '\\"') : ''}",
   "transcript": "Audio monologue or dialogue script...",
   "questions": [
     {
       "order": 1,
-      "prompt": "Question prompt",
+      "prompt": "${isMap ? 'Label the map below. Choose the correct letter (A-E) for: [Location Name]' : 'Question prompt'}",
       "type": "${isMap ? 'map_labelling' : 'multiple_choice'}",
-      "options": ["A", "B", "C", "D", "E", "F", "G"],
-      "correctAnswer": "B",
+      "options": ${isMap ? '["A", "B", "C", "D", "E"]' : '["A. Option 1", "B. Option 2", "C. Option 3", "D. Option 4"]'},
+      "correctAnswer": "A",
       "evidenceQuote": "exact sentence from transcript",
       "explanationBn": "বাংলায় ব্যাখ্যা...",
       "explanationEn": "English explanation..."
@@ -424,9 +425,9 @@ OUTPUT STRICT JSON FORMAT:
       type: q.type,
       options: q.options || [],
       correctAnswer: q.correctAnswer,
-      explanationBn: q.explanationBn,
-      explanationEn: q.explanationEn,
-      evidenceQuote: q.evidenceQuote,
+      explanationBn: q.explanationBn || '',
+      explanationEn: q.explanationEn || '',
+      evidenceQuote: q.evidenceQuote || '',
       order: q.order,
       status: 'published' as const,
       createdAt: new Date(),
@@ -472,9 +473,9 @@ OUTPUT STRICT JSON FORMAT:
       type: q.type,
       options: q.options || [],
       correctAnswer: q.correctAnswer,
-      explanationBn: q.explanationBn,
-      explanationEn: q.explanationEn,
-      evidenceQuote: q.evidenceQuote,
+      explanationBn: q.explanationBn || '',
+      explanationEn: q.explanationEn || '',
+      evidenceQuote: q.evidenceQuote || '',
       order: q.order,
       mapTitle: generated.mapTitle,
       mapSvgData: generated.mapSvgData,
