@@ -330,6 +330,10 @@ export const practiceRepository = {
       title: string;
       audioUrl: string;
       section: number;
+      hasMap?: boolean;
+      mapSvgData?: string;
+      mapTitle?: string;
+      transcript?: string;
     };
     questions: Array<{
       id: string;
@@ -337,6 +341,8 @@ export const practiceRepository = {
       prompt: string;
       options?: string[];
       order: number;
+      mapSvgData?: string;
+      mapTitle?: string;
     }>;
   } | null> {
     if (!ObjectId.isValid(itemId)) return null;
@@ -355,12 +361,16 @@ export const practiceRepository = {
         prompt: string;
         options?: string[];
         order: number;
+        mapSvgData?: string;
+        mapTitle?: string;
       }>({
         _id: 1,
         type: 1,
         prompt: 1,
         options: 1,
         order: 1,
+        mapSvgData: 1,
+        mapTitle: 1,
         // Omit correctAnswer, explanations, evidenceQuote
       })
       .toArray();
@@ -371,7 +381,10 @@ export const practiceRepository = {
         title: item.title,
         audioUrl: item.audioUrl,
         section: item.section,
-        // Transcript is strictly hidden during test
+        hasMap: item.hasMap,
+        mapSvgData: item.mapSvgData,
+        mapTitle: item.mapTitle,
+        transcript: item.transcript, // Sent so browser AI Speech Synthesizer can speak it without manual audio upload
       },
       questions: questions.map((q) => ({
         id: q._id.toString(),
@@ -379,6 +392,8 @@ export const practiceRepository = {
         prompt: q.prompt,
         options: q.options,
         order: q.order,
+        mapSvgData: q.mapSvgData,
+        mapTitle: q.mapTitle,
       })),
     };
   },

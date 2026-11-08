@@ -71,6 +71,7 @@ export const createQuestionSchema = z.object({
     'true_false_not_given',
     'fill_in_the_blank',
     'matching_headings',
+    'map_labelling',
   ]),
   prompt: z.string().trim().min(1, 'Question prompt is required'),
   options: z.array(z.string().trim()).optional().default([]),
@@ -79,6 +80,8 @@ export const createQuestionSchema = z.object({
   explanationEn: z.string().trim().min(1, 'English explanation is required'),
   evidenceQuote: z.string().trim().optional().default(''),
   order: z.number().int().default(1),
+  mapSvgData: z.string().optional(),
+  mapTitle: z.string().optional(),
   status: z.enum(['draft', 'published']).default('published'),
 });
 
@@ -89,9 +92,12 @@ export const updateQuestionSchema = createQuestionSchema.partial();
 // ==========================================
 export const createListeningSchema = z.object({
   title: z.string().trim().min(1, 'Title is required').max(200),
-  audioUrl: z.string().trim().url('Valid audio URL is required'),
+  audioUrl: z.string().trim().default('ai-speech://auto'),
   transcript: z.string().trim().min(1, 'Audio transcript is required'),
   section: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4)]).default(1),
+  hasMap: z.boolean().optional().default(false),
+  mapSvgData: z.string().optional(),
+  mapTitle: z.string().optional(),
   status: z.enum(['draft', 'published']).default('published'),
 });
 

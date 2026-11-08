@@ -92,7 +92,7 @@ export interface PassageDoc {
   updatedAt: Date;
 }
 
-export type QuestionType = 'multiple_choice' | 'true_false_not_given' | 'fill_in_the_blank' | 'matching_headings';
+export type QuestionType = 'multiple_choice' | 'true_false_not_given' | 'fill_in_the_blank' | 'matching_headings' | 'map_labelling';
 
 export interface QuestionDoc {
   _id: ObjectId;
@@ -107,6 +107,8 @@ export interface QuestionDoc {
   evidenceQuote?: string;
   order: number;
   status: 'draft' | 'published';
+  mapSvgData?: string;
+  mapTitle?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -114,9 +116,12 @@ export interface QuestionDoc {
 export interface ListeningItemDoc {
   _id: ObjectId;
   title: string;
-  audioUrl: string;
+  audioUrl: string; // URL to mp3/wav or 'ai-speech://auto' for zero-upload browser speech
   transcript: string;
   section: 1 | 2 | 3 | 4;
+  hasMap?: boolean;
+  mapSvgData?: string;
+  mapTitle?: string;
   status: 'draft' | 'published';
   createdAt: Date;
   updatedAt: Date;

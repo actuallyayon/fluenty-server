@@ -130,7 +130,7 @@ adminAiRoutes.post('/publish-reading', async (req: AuthenticatedRequest, res: Re
 // 3. Generate Listening Draft
 adminAiRoutes.post('/generate-listening', async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { topic, section, questionCount } = req.body;
+    const { topic, section, questionCount, isMapTest } = req.body;
     if (!topic) {
       res.status(400).json({ success: false, error: 'Topic is required' });
       return;
@@ -140,6 +140,7 @@ adminAiRoutes.post('/generate-listening', async (req: AuthenticatedRequest, res:
       topic,
       section: (Number(section) as 1 | 2 | 3 | 4) || 1,
       questionCount: Number(questionCount) || 3,
+      isMapTest: Boolean(isMapTest),
     });
 
     res.json({ success: true, generated });
