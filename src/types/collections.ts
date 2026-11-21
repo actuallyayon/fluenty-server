@@ -16,6 +16,10 @@ export interface ProfileDoc {
   examDate?: Date;
   currentLevel?: UserLevel;
   plan: PlanType;
+  paymentMethod?: string;
+  paymentStatus?: 'pending' | 'completed' | 'failed';
+  paymentTrxId?: string;
+  paymentAccountNumber?: string;
   stripeCustomerId?: string;
   stripeSubscriptionId?: string;
   xp: number;
@@ -243,7 +247,7 @@ export interface PaymentDoc {
   accountNumber?: string;
   amount: number;
   currency: string;
-  status: 'completed' | 'failed' | 'refunded';
+  status: 'completed' | 'failed' | 'refunded' | 'pending';
   plan: PlanType;
   createdAt: Date;
 }

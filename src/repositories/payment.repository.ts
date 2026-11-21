@@ -84,19 +84,23 @@ export const paymentRepository = {
       trxId: cleanTrxId,
       amount,
       currency: 'BDT',
-      status: 'completed',
+      status: 'pending',
       plan: 'premium',
       createdAt: new Date(),
     };
 
     await collections.payments().insertOne(paymentDoc);
 
-    // Upgrade learner profile to premium
+    // Automatically upgrade learner profile to pro/premium immediately until admin verifies
     await collections.profiles().updateOne(
       { userId },
       {
         $set: {
           plan: 'premium',
+          paymentMethod: method,
+          paymentStatus: 'pending',
+          paymentTrxId: cleanTrxId,
+          paymentAccountNumber: cleanAccount,
           updatedAt: new Date(),
         },
       }
@@ -106,8 +110,61 @@ export const paymentRepository = {
       success: true,
       paymentId: paymentDoc._id.toString(),
       plan: 'premium',
-      message: 'Payment verified successfully! Your account has been upgraded to Premium.',
+      message: 'Payment submitted! Your account has been automatically upgraded to Pro while admin verification is in progress.',
     };
+  },
+
+  /**
+   * Admin verify and complete payment
+   */
+  async verifyPayment(paymentId: string) {
+    if (!ObjectId.isValid(paymentId)) return null;
+    const pId = new ObjectId(paymentId);
+    const payment = await collections.payments().findOneAndUpdate(
+      { _id: pId },
+      { $set: { status: 'completed' } },
+      { returnDocument: 'after' }
+    );
+    if (!payment) return null;
+
+    await collections.profiles().updateOne(
+      { userId: payment.userId },
+      {
+        $set: {
+          plan: 'premium',
+          paymentStatus: 'completed',
+          updatedAt: new Date(),
+        },
+      }
+    );
+    return payment;
+  },
+
+  /**
+   * Admin reject payment and revert user to free
+   */
+  async rejectPayment(paymentId: string) {
+    if (!ObjectId.isValid(paymentId)) return null;
+    const pId = new ObjectId(paymentId);
+    const payment = await collections.payments().findOneAndUpdate(
+      { _id: pId },
+      { $set: { status: 'failed' } },
+      { returnDocument: 'after' }
+    );
+    if (!payment) return null;
+
+    // Revert user to free plan
+    await collections.profiles().updateOne(
+      { userId: payment.userId },
+      {
+        $set: {
+          plan: 'free',
+          paymentStatus: 'failed',
+          updatedAt: new Date(),
+        },
+      }
+    );
+    return payment;
   },
 
   /**

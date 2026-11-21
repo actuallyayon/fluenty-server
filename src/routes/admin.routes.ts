@@ -5,6 +5,7 @@ import { requireAdmin, AuthenticatedRequest } from '../middlewares/auth.js';
 import { contentRepository } from '../repositories/content.repository.js';
 import { adminUserRepository } from '../repositories/admin-user.repository.js';
 import { mockExamRepository } from '../repositories/mock-exam.repository.js';
+import { paymentRepository } from '../repositories/payment.repository.js';
 import { collections } from '../db/index.js';
 import {
   createVocabSchema,
@@ -787,7 +788,7 @@ adminRoutes.get('/analytics', async (_req: AuthenticatedRequest, res: Response) 
     const paymentMethods: Record<string, number> = { bkash: 0, nagad: 0, rocket: 0, stripe: 0 };
 
     for (const p of paymentsList) {
-      if (p.status === 'completed') {
+      if (p.status === 'completed' || p.status === 'pending') {
         if (p.currency === 'BDT') {
           totalRevenueBdt += p.amount;
         } else {
@@ -799,17 +800,29 @@ adminRoutes.get('/analytics', async (_req: AuthenticatedRequest, res: Response) 
       }
     }
 
-    // Recent 10 transactions
-    const recentPayments = paymentsList.slice(0, 10).map((p) => ({
-      id: p._id.toString(),
-      userId: p.userId,
-      method: p.paymentMethod || 'stripe',
-      amount: p.amount,
-      currency: p.currency,
-      status: p.status,
-      trxId: p.trxId || p.stripeSessionId || 'N/A',
-      createdAt: p.createdAt,
-    }));
+    // Lookup user details for recent payments
+    const recentSlice = paymentsList.slice(0, 15);
+    const userIds = [...new Set(recentSlice.map((p) => p.userId))];
+    const userProfiles = await collections.profiles().find({ userId: { $in: userIds } }).toArray();
+    const profileMap = new Map(userProfiles.map((pr) => [pr.userId, pr]));
+
+    // Recent transactions with accurate payment method, user info, and account numbers
+    const recentPayments = recentSlice.map((p) => {
+      const prof = profileMap.get(p.userId);
+      return {
+        id: p._id.toString(),
+        userId: p.userId,
+        userName: prof?.name || 'Learner',
+        userEmail: prof?.email || 'N/A',
+        method: p.paymentMethod || 'stripe',
+        accountNumber: p.accountNumber || 'N/A',
+        amount: p.amount,
+        currency: p.currency,
+        status: p.status || 'pending',
+        trxId: p.trxId || p.stripeSessionId || 'N/A',
+        createdAt: p.createdAt,
+      };
+    });
 
     res.json({
       success: true,
@@ -834,7 +847,7 @@ adminRoutes.get('/analytics', async (_req: AuthenticatedRequest, res: Response) 
         revenue: {
           totalBdt: totalRevenueBdt,
           totalUsd: totalRevenueUsd,
-          transactionsCount: paymentsList.filter((p) => p.status === 'completed').length,
+          transactionsCount: paymentsList.filter((p) => p.status === 'completed' || p.status === 'pending').length,
           paymentMethods,
           recentPayments,
         },
@@ -843,6 +856,37 @@ adminRoutes.get('/analytics', async (_req: AuthenticatedRequest, res: Response) 
   } catch (error) {
     console.error('Analytics aggregation error:', error);
     res.status(500).json({ success: false, error: 'Failed to aggregate platform analytics' });
+  }
+});
+
+// ==========================================
+// 8B. Payment Verification Endpoints
+// ==========================================
+adminRoutes.patch('/payments/:id/verify', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const payment = await paymentRepository.verifyPayment(req.params.id);
+    if (!payment) {
+      res.status(404).json({ success: false, error: 'Payment not found' });
+      return;
+    }
+    res.json({ success: true, message: 'Payment verified and learner confirmed as permanent Pro', payment });
+  } catch (error) {
+    console.error('Verify payment error:', error);
+    res.status(500).json({ success: false, error: 'Failed to verify payment' });
+  }
+});
+
+adminRoutes.patch('/payments/:id/reject', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const payment = await paymentRepository.rejectPayment(req.params.id);
+    if (!payment) {
+      res.status(404).json({ success: false, error: 'Payment not found' });
+      return;
+    }
+    res.json({ success: true, message: 'Payment rejected and learner reverted to Free plan', payment });
+  } catch (error) {
+    console.error('Reject payment error:', error);
+    res.status(500).json({ success: false, error: 'Failed to reject payment' });
   }
 });
 

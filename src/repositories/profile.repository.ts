@@ -13,6 +13,10 @@ export interface FormattedProfile {
   examDate?: string;
   currentLevel?: UserLevel;
   plan: PlanType;
+  paymentMethod?: string;
+  paymentStatus?: 'pending' | 'completed' | 'failed';
+  paymentTrxId?: string;
+  paymentAccountNumber?: string;
   xp: number;
   dailyStreak: number;
   lastActiveDate?: string;
@@ -33,6 +37,10 @@ export function formatProfile(doc: ProfileDoc): FormattedProfile {
     examDate: doc.examDate ? doc.examDate.toISOString() : undefined,
     currentLevel: doc.currentLevel,
     plan: doc.plan,
+    paymentMethod: doc.paymentMethod,
+    paymentStatus: doc.paymentStatus,
+    paymentTrxId: doc.paymentTrxId,
+    paymentAccountNumber: doc.paymentAccountNumber,
     xp: doc.xp,
     dailyStreak: doc.dailyStreak,
     lastActiveDate: doc.lastActiveDate ? doc.lastActiveDate.toISOString() : undefined,
