@@ -7,6 +7,7 @@ import {
   generatedListeningSchema,
   generatedWritingSchema,
   generatedSpeakingSchema,
+  generatedVocabSchema,
 } from '../services/ai/admin-generator.service.js';
 import { newsPortalService } from '../services/news/news-portal.service.js';
 
@@ -221,5 +222,39 @@ adminAiRoutes.post('/publish-speaking', async (req: AuthenticatedRequest, res: R
   } catch (error: any) {
     console.error('Publish speaking error:', error);
     res.status(400).json({ success: false, error: error.message || 'Failed to publish speaking' });
+  }
+});
+
+// 9. Generate Vocabulary Draft
+adminAiRoutes.post('/generate-vocab', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { topic, difficulty, wordCount } = req.body;
+    if (!topic) {
+      res.status(400).json({ success: false, error: 'Topic is required' });
+      return;
+    }
+
+    const generated = await adminGeneratorService.generateVocab({
+      topic,
+      difficulty: difficulty || 'medium',
+      wordCount: Number(wordCount) || 5,
+    });
+
+    res.json({ success: true, generated });
+  } catch (error: any) {
+    console.error('Admin AI generate vocab error:', error);
+    res.status(500).json({ success: false, error: error.message || 'Vocab generation failed' });
+  }
+});
+
+// 10. Publish Approved Vocabulary Items
+adminAiRoutes.post('/publish-vocab', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const parsed = generatedVocabSchema.parse(req.body);
+    const result = await adminGeneratorService.publishVocab(parsed, req.body.status || 'published');
+    res.status(201).json({ success: true, ...result });
+  } catch (error: any) {
+    console.error('Publish vocab error:', error);
+    res.status(400).json({ success: false, error: error.message || 'Failed to publish vocab' });
   }
 });

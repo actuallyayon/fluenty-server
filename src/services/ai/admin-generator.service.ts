@@ -67,10 +67,30 @@ export const generatedSpeakingSchema = z.object({
   part3Questions: z.array(z.string()),
 });
 
+export const generatedVocabItemSchema = z.object({
+  word: z.string(),
+  partOfSpeech: z.string(),
+  pronunciation: z.string().optional().default(''),
+  meaningEn: z.string(),
+  meaningBn: z.string(),
+  exampleEn: z.string(),
+  exampleBn: z.string(),
+  topic: z.string(),
+  difficulty: z.enum(['easy', 'medium', 'hard']),
+});
+
+export const generatedVocabSchema = z.object({
+  topic: z.string(),
+  difficulty: z.enum(['easy', 'medium', 'hard']),
+  words: z.array(generatedVocabItemSchema),
+});
+
 export type GeneratedReading = z.infer<typeof generatedReadingSchema>;
 export type GeneratedListening = z.infer<typeof generatedListeningSchema>;
 export type GeneratedWriting = z.infer<typeof generatedWritingSchema>;
 export type GeneratedSpeaking = z.infer<typeof generatedSpeakingSchema>;
+export type GeneratedVocabItem = z.infer<typeof generatedVocabItemSchema>;
+export type GeneratedVocab = z.infer<typeof generatedVocabSchema>;
 
 export const adminGeneratorService = {
   // 1. Generate Reading Passage & Questions
@@ -528,5 +548,87 @@ OUTPUT STRICT JSON FORMAT:
 
     await collections.speakingCues().insertOne(cueDoc);
     return { cueId: cueDoc._id.toString() };
+  },
+
+  // 9. Generate IELTS Vocabulary Items
+  async generateVocab(params: {
+    topic: string;
+    difficulty: 'easy' | 'medium' | 'hard';
+    wordCount?: number;
+  }): Promise<GeneratedVocab> {
+    const count = params.wordCount || 5;
+    const prompt = `You are a Senior Cambridge IELTS Lexical Resource Expert and Lexicographer for Bengali speakers.
+Create a collection of ${count} high-impact, Band 7.0-9.0 IELTS academic vocabulary words related to the topic.
+TOPIC: ${params.topic}
+DIFFICULTY: ${params.difficulty}
+
+REQUIREMENTS:
+1. Generate exactly ${count} sophisticated lexical items (academic words, high-level collocations, or formal verbs/adjectives/nouns).
+2. For each word provide:
+   - "word": The target vocabulary word (capitalized initial or lower).
+   - "partOfSpeech": Accurate part of speech ("noun", "verb", "adjective", or "adverb").
+   - "pronunciation": IPA phonetic transcription (e.g. "/ˌæk.wɪˈzɪʃ.ən/").
+   - "meaningEn": Precise, academic English definition.
+   - "meaningBn": Accurate, natural Bengali translation of the meaning (বাংলা অর্থ).
+   - "exampleEn": A formal IELTS Academic Writing Task 2 or Speaking Part 3 sentence demonstrating the word.
+   - "exampleBn": Accurate, natural Bengali translation of the example sentence.
+   - "topic": "${params.topic}"
+   - "difficulty": "${params.difficulty}"
+
+OUTPUT STRICT JSON FORMAT:
+{
+  "topic": "${params.topic}",
+  "difficulty": "${params.difficulty}",
+  "words": [
+    {
+      "word": "Ubiquitous",
+      "partOfSpeech": "adjective",
+      "pronunciation": "/juːˈbɪk.wɪ.təs/",
+      "meaningEn": "Present, appearing, or found everywhere at the same time.",
+      "meaningBn": "সর্বব্যাপী বা সর্বত্র বিদ্যমান",
+      "exampleEn": "Smartphones have become ubiquitous across contemporary urban societies, reshaping interpersonal interaction.",
+      "exampleBn": "স্মার্টফোন আধুনিক নগর সমাজে সর্বত্র বিদ্যমান হয়ে উঠেছে, যা পারস্পরিক যোগাযোগকে নতুন রূপ দিয়েছে।",
+      "topic": "${params.topic}",
+      "difficulty": "${params.difficulty}"
+    }
+  ]
+}`;
+
+    const raw = await geminiService.generateContentWithRetry(prompt);
+    const clean = geminiService.cleanJsonText(raw);
+    return generatedVocabSchema.parse(JSON.parse(clean));
+  },
+
+  // 10. Direct Save of Approved Generated Vocabulary Items
+  async publishVocab(
+    generated: GeneratedVocab,
+    status: 'published' | 'draft' = 'published'
+  ): Promise<{ count: number; insertedIds: string[] }> {
+    const now = new Date();
+    const docs = generated.words.map((w) => ({
+      _id: new ObjectId(),
+      word: w.word.trim(),
+      partOfSpeech: w.partOfSpeech.trim().toLowerCase(),
+      pronunciation: w.pronunciation?.trim() || '',
+      meaningEn: w.meaningEn.trim(),
+      meaningBn: w.meaningBn.trim(),
+      exampleEn: w.exampleEn.trim(),
+      exampleBn: w.exampleBn.trim(),
+      topic: w.topic.trim() || generated.topic,
+      difficulty: w.difficulty || generated.difficulty,
+      status: status,
+      createdAt: now,
+      updatedAt: now,
+    }));
+
+    if (docs.length === 0) {
+      return { count: 0, insertedIds: [] };
+    }
+
+    const result = await collections.vocabItems().insertMany(docs);
+    return {
+      count: result.insertedCount,
+      insertedIds: Object.values(result.insertedIds).map((id) => id.toString()),
+    };
   },
 };
